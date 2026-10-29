@@ -1,0 +1,17 @@
+[dumpfile] "single_cycle.vcd"
+[timestart] 0
+[treeopen] tb_single_cycle_wave.
+[treeopen] tb_single_cycle_wave.dut.
+@28
+tb_single_cycle_wave.clk
+tb_single_cycle_wave.reset
+@22
+tb_single_cycle_wave.dut.PC[31:0]
+tb_single_cycle_wave.dut.Instr[31:0]
+@28
+tb_single_cycle_wave.MemWrite
+@22
+tb_single_cycle_wave.DataAdr[31:0]
+tb_single_cycle_wave.WriteData[31:0]
+[pattern_trace] 1
+[pattern_trace] 0
