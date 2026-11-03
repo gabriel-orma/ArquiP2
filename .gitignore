@@ -13,6 +13,8 @@ vivado/*.sim/
 vivado/*.runs/
 vivado/*.srcs/
 *.xpr
+# proyecto generado por crear_proyecto.tcl (se regenera; no versionar)
+vivado/pipeline_e1/
 
 # Editor / SO
 .vscode/

@@ -1,0 +1,42 @@
+==========================================================================
+ COMANDOS PARA LAS 4 WAVEFORMS DEL INFORME (Vivado - Tcl Console)
+==========================================================================
+Uso: copia UN bloque, pegalo en la Tcl Console de Vivado y Enter.
+El script carga el .dat correcto, pone su testbench, agrega las senales
+y corre la simulacion. Cuando termine: "Zoom Fit" y toma el screenshot.
+Luego repite con el siguiente bloque.
+
+(Cada bloque recrea el proyecto automaticamente; no necesitas cerrar nada.)
+
+--------------------------------------------------------------------------
+ 4.1  SIN DEPENDENCIAS  (esperado: Mem[100] = 25)
+--------------------------------------------------------------------------
+set PROG prog_nohazard.dat ; set TB tb_pipeline_nohazard ; source {C:/Users/gabor/Documents/UTEC/Arqui/Proyecto2/vivado/crear_proyecto.tcl}
+
+   Senales clave: clk, PC, Instr, MemWrite, DataAdr, WriteData
+
+--------------------------------------------------------------------------
+ 4.2  FORWARDING  (esperado: Mem[100] = 28)
+--------------------------------------------------------------------------
+set PROG prog_forward.dat ; set TB tb_pipeline_forward ; source {C:/Users/gabor/Documents/UTEC/Arqui/Proyecto2/vivado/crear_proyecto.tcl}
+
+   Senales clave: ForwardAE, ForwardBE, SrcAE, ALUResultM, ResultW
+
+--------------------------------------------------------------------------
+ 4.3  STALL (load-use)  (esperado: Mem[100] = 14)
+--------------------------------------------------------------------------
+set PROG prog_stall.dat ; set TB tb_pipeline_stall ; source {C:/Users/gabor/Documents/UTEC/Arqui/Proyecto2/vivado/crear_proyecto.tcl}
+
+   Senales clave: StallF, StallD, FlushE  (y ver el consumidor esperando 1 ciclo)
+
+--------------------------------------------------------------------------
+ 4.4  FLUSH (branch)  (esperado: Mem[100] = 5)
+--------------------------------------------------------------------------
+set PROG prog_flush.dat ; set TB tb_pipeline_flush ; source {C:/Users/gabor/Documents/UTEC/Arqui/Proyecto2/vivado/crear_proyecto.tcl}
+
+   Senales clave: PCSrcE, FlushD, FlushE, PCTargetE
+
+==========================================================================
+ NOTA: si moviste la carpeta del proyecto, cambia la ruta entre { } por
+ la ruta real de tu crear_proyecto.tcl (usa / en vez de \ aunque sea Windows).
+==========================================================================
