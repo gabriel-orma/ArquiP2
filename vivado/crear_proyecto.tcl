@@ -22,6 +22,10 @@
 #     prog_forward.dat   ->  tb_pipeline_forward    (forwarding,            Mem[100]=28)
 #     prog_stall.dat     ->  tb_pipeline_stall      (load-use,              Mem[100]=14)
 #     prog_flush.dat     ->  tb_pipeline_flush      (branch flush,          Mem[100]=5)
+#
+#   DEMO VISUAL del flujo por etapas (muestra la instruccion en texto en F/D/E/M/W):
+#     prog_stall.dat     ->  tb_pipeline_trace      (se ve la burbuja del load-use)
+#     (sirve con cualquier prog_*.dat; usa radix ASCII en txtF..txtW)
 # =====================================================================
 
 # ---------- parametros (editables antes del source) ----------
@@ -92,6 +96,18 @@ if {$TB eq "tb_pipeline_forward"} {
   set hz {}
 }
 foreach s $hz { catch { add_wave [get_objects $dp/$s] } }
+
+# 3b) TRACE: instruccion (en TEXTO) presente en cada etapa F/D/E/M/W,
+#     mas las senales que explican las burbujas. radix ASCII = se lee el mnemonico.
+if {$TB eq "tb_pipeline_trace"} {
+  foreach s {txtF txtD txtE txtM txtW} {
+    catch {
+      set w [add_wave [get_objects $tb/$s]]   ;# captura el objeto wave creado
+      set_property RADIX ascii $w              ;# ASCII = se lee el mnemonico
+    }
+  }
+  foreach s {StallF StallD FlushD FlushE PCSrcE} { catch { add_wave [get_objects $dp/$s] } }
+}
 
 # 4) resultado final (siempre)
 foreach s {MemWrite DataAdr WriteData} { catch { add_wave [get_objects $tb/dut/$s] } }
