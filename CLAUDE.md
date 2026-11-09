@@ -151,3 +151,12 @@ El usuario pidió que cada respuesta termine con una sección **"Prompt Improvem
 - ¿Se esperan instrucciones adicionales además de las 13 que soporta el single-cycle (`bne`, `jalr`, `lui`...)?
 - ¿Tamaño de memorias (hoy 64 palabras) y formato del programa del profesor?
 - ¿Número de integrantes y fechas exactas de E1, E2, EF y presentación?
+
+## 14. Diagramas de datapath (para informes y presentación)
+
+Para dibujar datapaths estilo Harris & Harris usar el motor `hde` (comando global; código en `C:\Users\gabor\Documents\UTEC\Arqui\harris-diagram-engine`).
+
+- Antes de escribir el YAML, leer `C:\Users\gabor\Documents\UTEC\Arqui\harris-diagram-engine\AGENTS.md`.
+- Punto de partida para la configuración A: `C:\Users\gabor\Documents\UTEC\Arqui\harris-diagram-engine\examples\harris-pipelined-hazard.yaml` (pipeline de 5 etapas con Hazard Unit). Copiarlo a `docs/diagramas/` y adaptarlo a las señales reales del diseño.
+- Bucle: `hde lint x.yaml --compact` → corregir según `issues[].hint` → repetir hasta `"ok": true` → `hde render x.yaml -o x.svg` (o `.tex` para LaTeX, `.html` interactivo).
+- El soporte para Dual-Issue (configuración B: `lane`, `regfile4r2w`) existe en el modelo, pero aún no hay un ejemplo probado de 2 vías.

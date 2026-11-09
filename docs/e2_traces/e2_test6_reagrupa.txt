@@ -1,0 +1,42 @@
+c1 PC=0 em=2           | v0 F=addi     E=bubble   M=bubble   W=bubble   | v1 F=addi     E=bubble   M=bubble   W=bubble  
+c2 PC=8 em=1           | v0 F=add      E=addi     M=bubble   W=bubble   | v1 F=sub      E=addi     M=bubble   W=bubble  
+c3 PC=12 em=1           | v0 F=sub      E=add      M=addi     W=bubble   | v1 F=add      E=bubble   M=addi     W=bubble  
+c4 PC=16 em=1           | v0 F=add      E=sub      M=add      W=addi     | v1 F=add      E=bubble   M=bubble   W=addi    
+c5 PC=20 em=1           | v0 F=add      E=add      M=sub      W=add      | v1 F=sw       E=bubble   M=bubble   W=bubble  
+c6 PC=24 em=2           | v0 F=sw       E=add      M=add      W=sub      | v1 F=beq      E=bubble   M=bubble   W=bubble  
+c7 PC=32 em=2     FLUSH | v0 F=----     E=sw       M=add      W=add      | v1 F=----     E=beq      M=bubble   W=bubble  
+c8 PC=28 em=2           | v0 F=beq      E=bubble   M=sw       W=add      | v1 F=----     E=bubble   M=beq      W=bubble  
+c9 PC=36 em=2     FLUSH | v0 F=----     E=beq      M=bubble   W=sw       | v1 F=----     E=----     M=bubble   W=beq     
+c10 PC=28 em=2           | v0 F=beq      E=bubble   M=beq      W=bubble   | v1 F=----     E=bubble   M=----     W=bubble  
+c11 PC=36 em=2     FLUSH | v0 F=----     E=beq      M=bubble   W=beq      | v1 F=----     E=----     M=bubble   W=----    
+c12 PC=28 em=2           | v0 F=beq      E=bubble   M=beq      W=bubble   | v1 F=----     E=bubble   M=----     W=bubble  
+c13 PC=36 em=2     FLUSH | v0 F=----     E=beq      M=bubble   W=beq      | v1 F=----     E=----     M=bubble   W=----    
+c14 PC=28 em=2           | v0 F=beq      E=bubble   M=beq      W=bubble   | v1 F=----     E=bubble   M=----     W=bubble  
+c15 PC=36 em=2     FLUSH | v0 F=----     E=beq      M=bubble   W=beq      | v1 F=----     E=----     M=bubble   W=----    
+c16 PC=28 em=2           | v0 F=beq      E=bubble   M=beq      W=bubble   | v1 F=----     E=bubble   M=----     W=bubble  
+c17 PC=36 em=2     FLUSH | v0 F=----     E=beq      M=bubble   W=beq      | v1 F=----     E=----     M=bubble   W=----    
+c18 PC=28 em=2           | v0 F=beq      E=bubble   M=beq      W=bubble   | v1 F=----     E=bubble   M=----     W=bubble  
+c19 PC=36 em=2     FLUSH | v0 F=----     E=beq      M=bubble   W=beq      | v1 F=----     E=----     M=bubble   W=----    
+c20 PC=28 em=2           | v0 F=beq      E=bubble   M=beq      W=bubble   | v1 F=----     E=bubble   M=----     W=bubble  
+c21 PC=36 em=2     FLUSH | v0 F=----     E=beq      M=bubble   W=beq      | v1 F=----     E=----     M=bubble   W=----    
+c22 PC=28 em=2           | v0 F=beq      E=bubble   M=beq      W=bubble   | v1 F=----     E=bubble   M=----     W=bubble  
+c23 PC=36 em=2     FLUSH | v0 F=----     E=beq      M=bubble   W=beq      | v1 F=----     E=----     M=bubble   W=----    
+c24 PC=28 em=2           | v0 F=beq      E=bubble   M=beq      W=bubble   | v1 F=----     E=bubble   M=----     W=bubble  
+c25 PC=36 em=2     FLUSH | v0 F=----     E=beq      M=bubble   W=beq      | v1 F=----     E=----     M=bubble   W=----    
+c26 PC=28 em=2           | v0 F=beq      E=bubble   M=beq      W=bubble   | v1 F=----     E=bubble   M=----     W=bubble  
+c27 PC=36 em=2     FLUSH | v0 F=----     E=beq      M=bubble   W=beq      | v1 F=----     E=----     M=bubble   W=----    
+---------- estado final ----------
+  x1 = 1
+  x2 = 2
+  x3 = 3
+  x4 = 2
+  x5 = 4
+  x6 = 5
+  x7 = 0
+  x8 = 0
+  x9 = 0
+  x10 = 0
+  x11 = 0
+  Mem[96]=x  Mem[100]=5
+tb/tb_dual_trace.v:75: $finish called at 300000 (1ps)
+c28 PC=28 em=2           | v0 F=beq      E=bubble   M=beq      W=bubble   | v1 F=----     E=bubble   M=----     W=bubble  
