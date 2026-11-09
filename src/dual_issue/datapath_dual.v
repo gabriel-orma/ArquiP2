@@ -142,6 +142,19 @@ module datapath_dual(
     (RegWrite1M & (Rd1M!=0) & (Rd1M==Rs2_1))         ? fwdValM1 :
     (RegWrite0M & (Rd0M!=0) & (Rd0M==Rs2_1))         ? fwdValM0 : RD2_1D;
 
+  // --- indicadores de forwarding (solo para OBSERVAR en el waveform) ---
+  // Valen 1 cuando ese operando se esta adelantando (no viene del regfile).
+  // No se usan en la logica; existen para que la prueba de RAW+forwarding
+  // muestre claramente cuando y a quien se forwardea.
+  wire fwdA0act = (RegWrite1E&(Rd1E!=0)&(Rd1E==Rs1_0)&~lwE1)|(RegWrite0E&(Rd0E!=0)&(Rd0E==Rs1_0)&~lwE0)|
+                  (RegWrite1M&(Rd1M!=0)&(Rd1M==Rs1_0))|(RegWrite0M&(Rd0M!=0)&(Rd0M==Rs1_0));
+  wire fwdB0act = (RegWrite1E&(Rd1E!=0)&(Rd1E==Rs2_0)&~lwE1)|(RegWrite0E&(Rd0E!=0)&(Rd0E==Rs2_0)&~lwE0)|
+                  (RegWrite1M&(Rd1M!=0)&(Rd1M==Rs2_0))|(RegWrite0M&(Rd0M!=0)&(Rd0M==Rs2_0));
+  wire fwdA1act = (RegWrite1E&(Rd1E!=0)&(Rd1E==Rs1_1)&~lwE1)|(RegWrite0E&(Rd0E!=0)&(Rd0E==Rs1_1)&~lwE0)|
+                  (RegWrite1M&(Rd1M!=0)&(Rd1M==Rs1_1))|(RegWrite0M&(Rd0M!=0)&(Rd0M==Rs1_1));
+  wire fwdB1act = (RegWrite1E&(Rd1E!=0)&(Rd1E==Rs2_1)&~lwE1)|(RegWrite0E&(Rd0E!=0)&(Rd0E==Rs2_1)&~lwE0)|
+                  (RegWrite1M&(Rd1M!=0)&(Rd1M==Rs2_1))|(RegWrite0M&(Rd0M!=0)&(Rd0M==Rs2_1));
+
   // --- control empaquetado D->E (10 bits por via) ---
   // {RegWrite, ResultSrc(2), MemWrite, Jump, Branch, ALUSrc, ALUControl(3)}
   wire [9:0] ctrl0D = {RegWrite0D, ResultSrc0D, MemWrite0D, Jump0D, Branch0D, ALUSrc0D, ALUControl0D};

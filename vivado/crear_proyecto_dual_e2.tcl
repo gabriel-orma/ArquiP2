@@ -93,6 +93,31 @@ foreach s {t0F t0E t0M t0W t1F t1E t1M t1W} {
   }
 }
 
+# 3b) SENALES RELEVANTES SEGUN EL PROGRAMA (cada prueba muestra lo suyo)
+if {$PROG eq "e2_test2_raw_fwd.dat"} {
+  # RAW + forwarding: indicadores de forwarding + operando forwardeado vs regfile
+  foreach s {fwdA0act fwdB0act fwdA1act fwdB1act SrcA_1D RD1_1D} {
+    catch { add_wave [get_objects $dp/$s] }
+  }
+  catch { set_property RADIX unsigned [get_waves $dp/SrcA_1D] }
+  catch { set_property RADIX unsigned [get_waves $dp/RD1_1D] }
+} elseif {$PROG eq "e2_test3_loaduse_mem.dat"} {
+  # load-use + conflicto de memoria: lw en EX y operaciones de memoria por via
+  foreach s {lwE0 lwE1 memOp0M memOp1M} { catch { add_wave [get_objects $dp/$s] } }
+} elseif {$PROG eq "e2_test4_branch_flush.dat"} {
+  # branch: salto de cada via (lo que dispara flushDE/annul1)
+  foreach s {PCSrc0E PCSrc1E} { catch { add_wave [get_objects $dp/$s] } }
+} elseif {$PROG eq "e2_test5_2writes.dat"} {
+  # 2 escrituras al regfile: los dos puertos de escritura (we/rd/dato)
+  foreach s {RegWrite0W Rd0W Result0W RegWrite1W Rd1W Result1W} {
+    catch { add_wave [get_objects $dp/$s] }
+  }
+  foreach s {Rd0W Result0W Rd1W Result1W} { catch { set_property RADIX unsigned [get_waves $dp/$s] } }
+} elseif {$PROG eq "e2_test6_reagrupa.dat"} {
+  # reagrupamiento: issue1 (si la via 1 se emitio) junto a issueCount/PCF
+  foreach s {issue1} { catch { add_wave [get_objects $dp/$s] } }
+}
+
 # 4) resultado final (acceso a memoria de datos)
 foreach s {MemWrite DataAdr WriteData} { catch { add_wave [get_objects $tb/dut/$s] } }
 catch { set_property RADIX unsigned [get_waves $tb/dut/DataAdr] }

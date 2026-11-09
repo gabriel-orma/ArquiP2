@@ -54,6 +54,18 @@ Las instrucciones se muestran **en texto (radix ASCII)**, no en binario:
 - **Vía 1 (texto ASCII):** `t1F t1E t1M t1W`.
 - **Resultado:** `MemWrite`, `DataAdr`, `WriteData`.
 
+### Señales específicas por programa (el script las agrega solas)
+
+Según el `PROG` elegido, el script añade las señales relevantes de ese escenario:
+
+| Programa | Señales extra que agrega | Qué ves |
+|---|---|---|
+| `e2_test2_raw_fwd`      | `fwdA0act fwdB0act fwdA1act fwdB1act`, `SrcA_1D`, `RD1_1D` | el indicador de forwarding en 1 + el operando forwardeado distinto del valor del regfile |
+| `e2_test3_loaduse_mem`  | `lwE0 lwE1`, `memOp0M memOp1M` | el `lw` en EX (causa del stall) y las operaciones de memoria por vía (conflicto) |
+| `e2_test4_branch_flush` | `PCSrc0E PCSrc1E` | qué vía toma el salto (lo que dispara `flushDE`/`annul1`) |
+| `e2_test5_2writes`      | `RegWrite0W Rd0W Result0W`, `RegWrite1W Rd1W Result1W` | los 2 puertos de escritura activos el mismo ciclo |
+| `e2_test6_reagrupa`     | `issue1` | cuándo la vía 1 NO se emite (y se reagrupa) |
+
 > Si alguna señal `t0*`/`t1*` queda en hexadecimal: selecciónala en la waveform →
 > clic derecho → **Radix → ASCII**.
 
