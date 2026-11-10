@@ -1,15 +1,7 @@
-// tb_dual_trace: testbench GENERICO de traza para el dual-issue (E2).
-//
-// Pensado para la critica del profesor en E1: que en el waveform se vea CLARO
-// lo que pasa, con las instrucciones en TEXTO (no binario). Por cada ciclo
-// imprime, por via y por etapa, que instruccion esta (mnemonico via disasm) y
-// cuantas se emiten, con banderas STALL/FLUSH/ANNUL.
-//
-// Corre el programa cargado en 'riscvtest.dat' (se intercambia el .dat para
-// cada prueba). Al final vuelca registros y memoria.
-//
-// Para Vivado: expone senales txt* (ASCII) para poner en la waveform con
-// radix ASCII y ver las instrucciones por nombre en cada etapa.
+// tb_dual_trace: testbench de traza para el dual-issue (E2).
+// Corre el programa en riscvtest.dat e imprime, por ciclo, la instruccion en
+// cada etapa/via (texto via disasm) y las banderas. Expone senales txt* (ASCII)
+// para la waveform de Vivado.
 `timescale 1ns/1ps
 module tb_dual_trace;
   reg clk, reset;
@@ -24,9 +16,7 @@ module tb_dual_trace;
   wire [31:0] i0F = dut.dp.Instr0F;
   wire [31:0] i1F = dut.dp.Instr1F;
 
-  // ---- reconstruccion de la instruccion en cada etapa (vias 0 y 1) ----
-  // Se replica el pipeline: D/E se limpia con clear0/clear1 (burbuja); E/M y
-  // M/W solo propagan. Asi sabemos que instruccion viaja por cada etapa.
+  // reconstruccion de la instruccion en cada etapa (replica el pipeline)
   reg [31:0] i0E, i0M, i0W, i1E, i1M, i1W;
   always @(posedge clk or posedge reset) begin
     if (reset) begin

@@ -30,15 +30,18 @@
 if {![info exists PART]} { set PART "xc7a35tcpg236-1" }       ;# 7 Series (Basys3). Cambia si tu Vivado no lo tiene.
 if {![info exists PROG]} { set PROG "e2_test1_dualalu.dat" }  ;# programa a cargar en imem2
 set TB   "tb_dual_trace"
-set PROJ "dual_e2"
+if {![info exists PROJ]} { set PROJ "dual_e2" }
 
 set origin  [file normalize [file dirname [info script]]]
 set projdir [file join $origin $PROJ]
 
 puts "== Config B (dual-issue): creando proyecto '$PROJ'  part=$PART  prog=$PROG =="
 
-catch { close_sim -quiet }
-catch { close_project }
+# cierra proyecto/simulacion solo si hay alguno abierto (evita el error en modo batch)
+if {[llength [get_projects -quiet]] > 0} {
+  catch { close_sim -quiet }
+  catch { close_project }
+}
 if {[file exists $projdir]} { file delete -force $projdir }
 
 create_project $PROJ $projdir -part $PART -force
