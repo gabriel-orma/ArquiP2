@@ -1,0 +1,58 @@
+===========================================================================
+ ENTREGA E1 - Procesador RISC-V RV32I (Configuracion A + Dual preliminar)
+===========================================================================
+
+CONTENIDO
+---------
+  codigo_verilog/
+    pipeline/      Pipeline single-issue de 5 etapas + Hazard Unit (19 .v)
+    dual/          Front-end Dual-Issue preliminar (imem2, dualfetchdecode)
+  mem/             Programas de prueba en hex (.dat)
+  testbenches/     Testbenches (4 de hazards + generico + dual)
+  informe/         Informe (exportar a PDF para la entrega final)
+
+COMO SE CARGA EL PROGRAMA
+-------------------------
+  La memoria de instrucciones (imem.v / imem2.v) lee un archivo llamado
+  "riscvtest.dat". Para correr un programa, copia el .dat deseado de mem/
+  con el nombre riscvtest.dat en la carpeta donde se ejecuta la simulacion.
+
+PROGRAMAS Y RESULTADO ESPERADO (Mem[100])
+-----------------------------------------
+  prog_nohazard.dat -> 25   (ISA sin dependencias)
+  prog_forward.dat  -> 28   (forwarding)
+  prog_stall.dat    -> 14   (load-use / stall)
+  prog_flush.dat    ->  5   (branch / flush)
+
+TESTBENCHES
+-----------
+  tb_pipeline_nohazard / forward / stall / flush : verifican Mem[100].
+  tb_pipeline_generic : corre cualquier programa y vuelca registros/memoria.
+  tb_dual_fetch_decode : evidencia de que las 2 vias decodifican a la vez.
+
+EJEMPLO DE EJECUCION (Icarus Verilog)
+-------------------------------------
+  # pipeline (forwarding):
+  copy mem\prog_forward.dat riscvtest.dat
+  iverilog -g2001 -o t.vvp codigo_verilog\pipeline\*.v testbenches\tb_pipeline_forward.v
+  vvp t.vvp
+
+  # dual:
+  copy mem\prog_forward.dat riscvtest.dat
+  iverilog -g2001 -o d.vvp codigo_verilog\dual\*.v codigo_verilog\pipeline\controller.v ^
+     codigo_verilog\pipeline\maindec.v codigo_verilog\pipeline\aludec.v ^
+     codigo_verilog\pipeline\flopr.v codigo_verilog\pipeline\adder.v ^
+     testbenches\tb_dual_fetch_decode.v
+  vvp d.vvp
+
+VERIFICACION
+------------
+  Todo verificado con Icarus Verilog (4/4 programas PASS + dual PASS).
+  Para Vivado (xsim) se usa el script crear_proyecto.tcl (en la carpeta vivado
+  del repositorio); la simulacion behavioral da el mismo resultado.
+
+NOTA FINAL
+----------
+  El informe/ incluye por ahora el .docx base. Para la ENTREGA FINAL debe
+  reemplazarse por el INFORME EN PDF completo (con las waveforms y diagramas).
+===========================================================================

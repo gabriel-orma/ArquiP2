@@ -1,5 +1,5 @@
 // datapath_dual: datapath del procesador superescalar dual-issue in-order (E2).
-// 4 etapas: F/D (fetch+decode+issue, combinacional) -> E -> M -> W. Dos vias.
+// 5 etapas: IF -> ID -> EX -> MEM -> WB. Dos vias.
 module datapath_dual(
   input         clk, reset,
   output [31:0] PCF,
@@ -11,14 +11,36 @@ module datapath_dual(
   output [1:0]  issueCountOut
 );
 
-  // ===================== ETAPA F/D =====================
-  wire [31:0] PCPlus4F, PCPlus8F, PCNextF;
-  assign PCPlus4F = PCF + 32'd4;
-  assign PCPlus8F = PCF + 32'd8;
+  // senales de control que se definen mas abajo (ID/EX, EX)
+  wire        stall, issue1;
+  wire [1:0]  issueCount;
+  wire        flushDE;              // salto tomado (de EX)
+  wire [31:0] PCTargetE;            // target del salto (de EX)
+  wire [31:0] PC1D;                 // direccion de la via1 en ID (para reagrupar)
 
+  // ===================== ETAPA IF =====================
+  // PC = puntero de fetch (imem2 esta en 'top'). Avanza +8; en emision parcial
+  // se redirige a PC1D (conservar la via1); en salto, al target; en stall, se congela.
+  wire [31:0] PCNextF;
+  assign PCNextF = flushDE          ? PCTargetE :
+                   stall            ? PCF :
+                   (issueCount==2'd1)? PC1D :
+                                      PCF + 32'd8;
+  flopr #(32) pcreg(.clk(clk), .reset(reset), .d(PCNextF), .q(PCF));
+
+  // registro IF/ID: guarda el par buscado. Se congela en stall (en=~stall) y se
+  // limpia en salto o en reagrupamiento (clear).
+  wire        flushIFID = flushDE | (issueCount==2'd1);
+  wire [31:0] I0D, I1D, PC0D;
+  flopenrc #(32) ifid_i0 (.clk(clk), .reset(reset), .clear(flushIFID), .en(~stall), .d(Instr0F),       .q(I0D));
+  flopenrc #(32) ifid_i1 (.clk(clk), .reset(reset), .clear(flushIFID), .en(~stall), .d(Instr1F),       .q(I1D));
+  flopenrc #(32) ifid_pc0(.clk(clk), .reset(reset), .clear(flushIFID), .en(~stall), .d(PCF),           .q(PC0D));
+  flopenrc #(32) ifid_pc1(.clk(clk), .reset(reset), .clear(flushIFID), .en(~stall), .d(PCF + 32'd4),   .q(PC1D));
+
+  // ===================== ETAPA ID =====================
   // campos de registro de cada via
-  wire [4:0] Rs1_0 = Instr0F[19:15], Rs2_0 = Instr0F[24:20], Rd0 = Instr0F[11:7];
-  wire [4:0] Rs1_1 = Instr1F[19:15], Rs2_1 = Instr1F[24:20], Rd1 = Instr1F[11:7];
+  wire [4:0] Rs1_0 = I0D[19:15], Rs2_0 = I0D[24:20], Rd0 = I0D[11:7];
+  wire [4:0] Rs1_1 = I1D[19:15], Rs2_1 = I1D[24:20], Rd1 = I1D[11:7];
 
   // 2 controllers
   wire [1:0] ResultSrc0D, ImmSrc0D, ResultSrc1D, ImmSrc1D;
@@ -26,11 +48,11 @@ module datapath_dual(
   wire       MemWrite0D, ALUSrc0D, RegWrite0D, Jump0D, Branch0D;
   wire       MemWrite1D, ALUSrc1D, RegWrite1D, Jump1D, Branch1D;
 
-  controller c0(.op(Instr0F[6:0]), .funct3(Instr0F[14:12]), .funct7b5(Instr0F[30]),
+  controller c0(.op(I0D[6:0]), .funct3(I0D[14:12]), .funct7b5(I0D[30]),
     .ResultSrc(ResultSrc0D), .MemWrite(MemWrite0D), .ALUSrc(ALUSrc0D),
     .RegWrite(RegWrite0D), .Jump(Jump0D), .Branch(Branch0D),
     .ImmSrc(ImmSrc0D), .ALUControl(ALUControl0D));
-  controller c1(.op(Instr1F[6:0]), .funct3(Instr1F[14:12]), .funct7b5(Instr1F[30]),
+  controller c1(.op(I1D[6:0]), .funct3(I1D[14:12]), .funct7b5(I1D[30]),
     .ResultSrc(ResultSrc1D), .MemWrite(MemWrite1D), .ALUSrc(ALUSrc1D),
     .RegWrite(RegWrite1D), .Jump(Jump1D), .Branch(Branch1D),
     .ImmSrc(ImmSrc1D), .ALUControl(ALUControl1D));
@@ -42,8 +64,8 @@ module datapath_dual(
 
   // inmediatos
   wire [31:0] ImmExt0D, ImmExt1D;
-  extend ext0(.instr(Instr0F[31:7]), .immsrc(ImmSrc0D), .immext(ImmExt0D));
-  extend ext1(.instr(Instr1F[31:7]), .immsrc(ImmSrc1D), .immext(ImmExt1D));
+  extend ext0(.instr(I0D[31:7]), .immsrc(ImmSrc0D), .immext(ImmExt0D));
+  extend ext1(.instr(I1D[31:7]), .immsrc(ImmSrc1D), .immext(ImmExt1D));
 
   // regfile 4R/2W (escrituras desde WB, abajo)
   wire [31:0] RD1_0D, RD2_0D, RD1_1D, RD2_1D;
@@ -69,8 +91,6 @@ module datapath_dual(
   wire [31:0] ALUResult0M, ALUResult1M, PCPlus4_0M, PCPlus4_1M;
 
   // Issue Unit
-  wire       stall, issue1;
-  wire [1:0] issueCount;
   issueunit iu(
     .Rs1_0(Rs1_0), .Rs2_0(Rs2_0), .Rd0(Rd0),
     .RegWrite0(RegWrite0D), .MemOp0(MemOp0), .BranchJump0(BrJmp0),
@@ -120,34 +140,33 @@ module datapath_dual(
   wire fwdB1act = (RegWrite1E&(Rd1E!=0)&(Rd1E==Rs2_1)&~lwE1)|(RegWrite0E&(Rd0E!=0)&(Rd0E==Rs2_1)&~lwE0)|
                   (RegWrite1M&(Rd1M!=0)&(Rd1M==Rs2_1))|(RegWrite0M&(Rd0M!=0)&(Rd0M==Rs2_1));
 
-  // control empaquetado D->E: {RegWrite, ResultSrc(2), MemWrite, Jump, Branch, ALUSrc, ALUControl(3)}
+  // control empaquetado ID->EX: {RegWrite, ResultSrc(2), MemWrite, Jump, Branch, ALUSrc, ALUControl(3)}
   wire [9:0] ctrl0D = {RegWrite0D, ResultSrc0D, MemWrite0D, Jump0D, Branch0D, ALUSrc0D, ALUControl0D};
   wire [9:0] ctrl1D = {RegWrite1D, ResultSrc1D, MemWrite1D, Jump1D, Branch1D, ALUSrc1D, ALUControl1D};
 
-  // burbujas del registro D/E
-  wire flushDE;
-  wire clear0 = stall | flushDE;                 // via0: stall o flush
+  // burbujas del registro ID/EX
+  wire clear0 = stall | flushDE;                 // via0: stall o salto
   wire clear1 = stall | flushDE | ~issue1;       // via1: ademas si no se emitio
 
-  // ===================== REGISTRO D/E =====================
+  // ===================== REGISTRO ID/EX =====================
   wire [9:0]  ctrl0E, ctrl1E;
   wire [31:0] SrcA0E, Data20E, Imm0E, PC0E;
   wire [31:0] SrcA1E, Data21E, Imm1E, PC1E;
 
-  floprc #(10) de0_ctrl(.clk(clk), .reset(reset), .clear(clear0), .d(ctrl0D),    .q(ctrl0E));
-  floprc #(32) de0_a   (.clk(clk), .reset(reset), .clear(clear0), .d(SrcA_0D),   .q(SrcA0E));
-  floprc #(32) de0_b   (.clk(clk), .reset(reset), .clear(clear0), .d(Data2_0D),  .q(Data20E));
-  floprc #(32) de0_imm (.clk(clk), .reset(reset), .clear(clear0), .d(ImmExt0D),  .q(Imm0E));
-  floprc #(32) de0_pc  (.clk(clk), .reset(reset), .clear(clear0), .d(PCF),       .q(PC0E));
-  floprc #(32) de0_pc4 (.clk(clk), .reset(reset), .clear(clear0), .d(PCPlus4F),  .q(PCPlus4_0E));
-  floprc #(5)  de0_rd  (.clk(clk), .reset(reset), .clear(clear0), .d(Rd0),       .q(Rd0E));
-  floprc #(10) de1_ctrl(.clk(clk), .reset(reset), .clear(clear1), .d(ctrl1D),    .q(ctrl1E));
-  floprc #(32) de1_a   (.clk(clk), .reset(reset), .clear(clear1), .d(SrcA_1D),   .q(SrcA1E));
-  floprc #(32) de1_b   (.clk(clk), .reset(reset), .clear(clear1), .d(Data2_1D),  .q(Data21E));
-  floprc #(32) de1_imm (.clk(clk), .reset(reset), .clear(clear1), .d(ImmExt1D),  .q(Imm1E));
-  floprc #(32) de1_pc  (.clk(clk), .reset(reset), .clear(clear1), .d(PCPlus4F),  .q(PC1E));
-  floprc #(32) de1_pc4 (.clk(clk), .reset(reset), .clear(clear1), .d(PCPlus8F),  .q(PCPlus4_1E));
-  floprc #(5)  de1_rd  (.clk(clk), .reset(reset), .clear(clear1), .d(Rd1),       .q(Rd1E));
+  floprc #(10) de0_ctrl(.clk(clk), .reset(reset), .clear(clear0), .d(ctrl0D),        .q(ctrl0E));
+  floprc #(32) de0_a   (.clk(clk), .reset(reset), .clear(clear0), .d(SrcA_0D),       .q(SrcA0E));
+  floprc #(32) de0_b   (.clk(clk), .reset(reset), .clear(clear0), .d(Data2_0D),      .q(Data20E));
+  floprc #(32) de0_imm (.clk(clk), .reset(reset), .clear(clear0), .d(ImmExt0D),      .q(Imm0E));
+  floprc #(32) de0_pc  (.clk(clk), .reset(reset), .clear(clear0), .d(PC0D),          .q(PC0E));
+  floprc #(32) de0_pc4 (.clk(clk), .reset(reset), .clear(clear0), .d(PC0D + 32'd4),  .q(PCPlus4_0E));
+  floprc #(5)  de0_rd  (.clk(clk), .reset(reset), .clear(clear0), .d(Rd0),           .q(Rd0E));
+  floprc #(10) de1_ctrl(.clk(clk), .reset(reset), .clear(clear1), .d(ctrl1D),        .q(ctrl1E));
+  floprc #(32) de1_a   (.clk(clk), .reset(reset), .clear(clear1), .d(SrcA_1D),       .q(SrcA1E));
+  floprc #(32) de1_b   (.clk(clk), .reset(reset), .clear(clear1), .d(Data2_1D),      .q(Data21E));
+  floprc #(32) de1_imm (.clk(clk), .reset(reset), .clear(clear1), .d(ImmExt1D),      .q(Imm1E));
+  floprc #(32) de1_pc  (.clk(clk), .reset(reset), .clear(clear1), .d(PC1D),          .q(PC1E));
+  floprc #(32) de1_pc4 (.clk(clk), .reset(reset), .clear(clear1), .d(PC1D + 32'd4),  .q(PCPlus4_1E));
+  floprc #(5)  de1_rd  (.clk(clk), .reset(reset), .clear(clear1), .d(Rd1),           .q(Rd1E));
 
   wire Jump0E, Branch0E, ALUSrc0E;  wire [2:0] ALUControl0E;
   wire Jump1E, Branch1E, ALUSrc1E;  wire [2:0] ALUControl1E;
@@ -172,14 +191,7 @@ module datapath_dual(
   wire MemWrite1E_eff = MemWrite1E & ~annul1;
 
   assign flushDE = PCSrc0E | (PCSrc1E & ~annul1);
-  wire [31:0] PCTargetE = PCSrc0E ? PCTarget0E : PCTarget1E;
-
-  // siguiente PC
-  assign PCNextF = flushDE          ? PCTargetE :
-                   stall            ? PCF       :
-                   (issueCount==2'd2)? PCPlus8F  :
-                                      PCPlus4F;
-  flopr #(32) pcreg(.clk(clk), .reset(reset), .d(PCNextF), .q(PCF));
+  assign PCTargetE = PCSrc0E ? PCTarget0E : PCTarget1E;
 
   wire [31:0] WriteData0E = Data20E;   // dato de store
   wire [31:0] WriteData1E = Data21E;
