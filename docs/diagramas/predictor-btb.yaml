@@ -1,0 +1,229 @@
+# Subsistema de prediccion de saltos (Configuracion C): PREDICTOR 2 bits + BTB.
+# Muestra TODOS los cables nuevos: lectura en IF (prediccion), el acarreo por los
+# registros de pipeline, y la verificacion + actualizacion en EX (lazo de realimentacion).
+# Convencion Harris: no se dibujan clk/reset (implicitos), como el resto de diagramas.
+version: 1
+title: "Config C - Predictor 2 bits + BTB"
+description: "Prediccion de salto en IF (BTB da el destino, el contador de 2 bits da tomado/no), acarreo por el pipeline y verificacion/actualizacion en EX."
+
+settings:
+  unit: 8
+  margin: 6
+
+stages:
+  - { id: IF, suffix: F, width: 104 }
+  - { id: ID, suffix: D, width: 16 }
+  - { id: EX, suffix: E, width: 96 }
+
+modules:
+  # ===================== IF: fetch / PC =====================
+  - { id: pcmux, type: mux4, stage: IF, at: [2, 46], sel: S,
+      info: "Mux del PC siguiente. in0=PC+8 (secuencial), in1=PC1D (reagrupamiento), in2=predTargetPkt (NUEVO: destino PREDICHO), in3=PCTargetE (NUEVO: PC correcto tras mala prediccion).",
+      tags: [nuevo-C, fetch] }
+  - { id: pc, type: flop, stage: IF, at: [9, 49], info: "Registro PC (PCF)." , tags: [fetch] }
+  - { id: k4, type: const, stage: IF, at: [12, 86], value: "4" }
+  - { id: pcadd4, type: adder, stage: IF, at: [16, 84], info: "PCF+4: direccion de la via1 del paquete y 2a lectura de las tablas.", tags: [fetch] }
+  - { id: k8, type: const, stage: IF, at: [12, 98], value: "8" }
+  - { id: pcadd8, type: adder, stage: IF, at: [16, 96], info: "PCF+8: avance secuencial de 2 instrucciones.", tags: [fetch] }
+
+  # ===================== IF: BTB + predictor =====================
+  - id: btb
+    type: box
+    stage: IF
+    at: [30, 12]
+    size: [16, 26]
+    label: "BTB"
+    info: "Branch Target Buffer (directo: valid+tag+target). Lee con PCF y PCF+4 (hit0/target0, hit1/target1); se escribe en EX al resolver un salto TOMADO (we,wPC,wTarget). Da el DESTINO del salto."
+    tags: [nuevo-C, prediccion]
+    ports:
+      rPC0:    { side: W, at: 4,  dir: in }
+      rPC1:    { side: W, at: 7,  dir: in }
+      wPC:     { side: W, at: 16, dir: in }
+      wTarget: { side: W, at: 19, dir: in }
+      we:      { side: W, at: 22, dir: in }
+      hit0:    { side: E, at: 4,  dir: out }
+      target0: { side: E, at: 8,  dir: out }
+      hit1:    { side: E, at: 16, dir: out }
+      target1: { side: E, at: 20, dir: out }
+  - id: bpred
+    type: box
+    stage: IF
+    at: [30, 48]
+    size: [16, 20]
+    label: "predictor 2b"
+    info: "Tabla de contadores saturados de 2 bits. Lee con PCF y PCF+4 (taken0/taken1 = MSB del contador); se actualiza en EX en toda resolucion de branch (we,wPC,wTaken). Da si el salto se TOMA o no."
+    tags: [nuevo-C, prediccion]
+    ports:
+      rPC0:   { side: W, at: 4,  dir: in }
+      rPC1:   { side: W, at: 7,  dir: in }
+      wPC:    { side: W, at: 12, dir: in }
+      wTaken: { side: W, at: 15, dir: in }
+      we:     { side: W, at: 18, dir: in }
+      taken0: { side: E, at: 5,  dir: out }
+      taken1: { side: E, at: 14, dir: out }
+
+  # ===================== IF: logica de prediccion =====================
+  - { id: andPT0, type: and, stage: IF, at: [54, 18], info: "predTaken0 = btb_hit0 & pred_t0 (la via0 predice salto tomado).", tags: [nuevo-C, prediccion] }
+  - { id: orPkt,  type: or,  stage: IF, at: [66, 16], info: "predTakenPkt = predTaken0 | predTaken1 (el paquete predice un salto).", tags: [nuevo-C, prediccion] }
+  - { id: notPT0, type: box, stage: IF, at: [54, 38], size: [6, 4], label: "NOT",
+      info: "~predTaken0: si la via0 ya predijo salto, la via1 no puede predecir otro.",
+      ports: { in: { side: W, at: 2, dir: in }, out: { side: E, at: 2, dir: out } }, tags: [nuevo-C] }
+  - { id: andPT1a, type: and, stage: IF, at: [54, 44], info: "btb_hit1 & pred_t1.", tags: [nuevo-C, prediccion] }
+  - { id: andPT1,  type: and, stage: IF, at: [66, 46], info: "predTaken1 = (btb_hit1 & pred_t1) & ~predTaken0.", tags: [nuevo-C, prediccion] }
+  - { id: muxTgt, type: mux2, stage: IF, at: [72, 30], sel: S,
+      info: "predTargetPkt = predTaken0 ? btb_target0 : btb_target1. Destino predicho que entra al mux del PC.", tags: [nuevo-C, prediccion] }
+  - id: pcselctl
+    type: box
+    stage: IF
+    at: [54, 56]
+    size: [16, 12]
+    label: "sel PCnext"
+    info: "Prioridad del PC siguiente: flushDE(mala pred) > stall > issueCount==1(reagrupa) > predTakenPkt(predice) > PC+8."
+    tags: [nuevo-C, fetch]
+    ports:
+      flushDE:  { side: W, at: 2,  dir: in }
+      stall:    { side: W, at: 5,  dir: in }
+      issueCnt: { side: W, at: 8,  dir: in }
+      predTk:   { side: E, at: 10, dir: in }
+      out:      { side: S, at: 8,  dir: out }
+  - { id: sqv1, type: box, stage: IF, at: [86, 10], size: [12, 4], label: "anula via1",
+      info: "predAnnul1 = predTaken0: si la via0 predijo salto, se limpia la via1 del paquete (clrI1 del registro IF/ID).",
+      ports: { in: { side: W, at: 2, dir: in } }, tags: [nuevo-C] }
+  - { id: sStall, type: box, stage: IF, at: [40, 74], size: [8, 3], label: "stall",
+      ports: { out: { side: E, at: 1, dir: out } } }
+  - { id: sIssue, type: box, stage: IF, at: [38, 80], size: [12, 3], label: "issueCnt==1",
+      ports: { out: { side: E, at: 1, dir: out } } }
+
+  # ===================== registros de pipeline =====================
+  - { id: ifid, type: pipereg, between: [IF, ID], clr: true, en: true,
+      info: "IF/ID: ademas de I0D/I1D lleva la prediccion: predTaken0/1, predTarget0/1 y PC0/PC1 (necesarios para verificar en EX).", tags: [registro] }
+  - { id: idex, type: pipereg, between: [ID, EX], clr: true, en: true,
+      info: "ID/EX: lleva la prediccion a EX (predTaken*E, predTarget*E, PC0E/PC1E).", tags: [registro] }
+
+  # ===================== EX: fuentes (del resto del datapath) =====================
+  - { id: sBr0,  type: box, stage: EX, at: [0, 4],  size: [8, 3], label: "Branch0E", ports: { out: { side: E, at: 1, dir: out } } }
+  - { id: sJmp0, type: box, stage: EX, at: [0, 10], size: [8, 3], label: "Jump0E",   ports: { out: { side: E, at: 1, dir: out } } }
+  - { id: orBr0, type: or, stage: EX, at: [12, 6], info: "isBr0E = Branch0E | Jump0E (la via0 es un salto).", tags: [nuevo-C] }
+  - { id: sBr1,  type: box, stage: EX, at: [0, 108], size: [8, 3], label: "Branch1E", ports: { out: { side: E, at: 1, dir: out } } }
+  - { id: sJmp1, type: box, stage: EX, at: [0, 114], size: [8, 3], label: "Jump1E",   ports: { out: { side: E, at: 1, dir: out } } }
+  - { id: orBr1, type: or, stage: EX, at: [12, 110], info: "isBr1E = Branch1E | Jump1E.", tags: [nuevo-C] }
+  - { id: sImm0, type: box, stage: EX, at: [0, 44], size: [8, 3], label: "Imm0E", ports: { out: { side: E, at: 1, dir: out } } }
+  - { id: pctadd0, type: adder, stage: EX, at: [12, 40], info: "PCTarget0E = PC0E + Imm0E (destino real de la via0).", tags: [branch] }
+  - { id: sImm1, type: box, stage: EX, at: [0, 82], size: [8, 3], label: "Imm1E", ports: { out: { side: E, at: 1, dir: out } } }
+  - { id: pctadd1, type: adder, stage: EX, at: [12, 78], info: "PCTarget1E = PC1E + Imm1E (destino real de la via1).", tags: [branch] }
+  - { id: sPCSrc0, type: box, stage: EX, at: [20, 60], size: [9, 3], label: "PCSrc0E", ports: { out: { side: E, at: 1, dir: out } } }
+  - { id: sPCSrc1, type: box, stage: EX, at: [20, 66], size: [9, 3], label: "PCSrc1E", ports: { out: { side: E, at: 1, dir: out } } }
+
+  # ===================== EX: verificacion y actualizacion =====================
+  - id: verify
+    type: box
+    stage: EX
+    at: [36, 12]
+    size: [28, 44]
+    label: "VERIFICACION"
+    info: "Compara prediccion vs realidad. mispred0/1 = direccion equivocada O (tomado a otro destino). Salidas: flushDE = mispred0|mispred1 (unico flush), PCTargetE = PC correcto (tomado->destino; predicho-tomado-y-no -> PC+4), annul1 = PCSrc0E."
+    tags: [nuevo-C, prediccion]
+    ports:
+      pt0:    { side: W, at: 2,  dir: in }
+      pt1:    { side: W, at: 4,  dir: in }
+      ptg0:   { side: W, at: 6,  dir: in }
+      ptg1:   { side: W, at: 8,  dir: in }
+      pc0:    { side: W, at: 12, dir: in }
+      pc1:    { side: W, at: 14, dir: in }
+      isbr0:  { side: W, at: 18, dir: in }
+      isbr1:  { side: W, at: 20, dir: in }
+      pcsrc0: { side: W, at: 24, dir: in }
+      pcsrc1: { side: W, at: 26, dir: in }
+      tgt0:   { side: W, at: 30, dir: in }
+      tgt1:   { side: W, at: 32, dir: in }
+      flushDE:   { side: E, at: 8,  dir: out }
+      PCTargetE: { side: E, at: 22, dir: out }
+      annul1:    { side: E, at: 36, dir: out }
+  - id: update
+    type: box
+    stage: EX
+    at: [36, 66]
+    size: [28, 42]
+    label: "ACTUALIZA BTB/PRED"
+    info: "Al resolver un branch escribe las tablas. brRes0=isBr0E, brRes1=isBr1E&~annul1. btb_we=(brRes0&PCSrc0E)|(brRes1&PCSrc1E) (inserta en TOMADO); pred_we=brRes0|brRes1 (siempre). wPC/wTgt/wTaken = los de la via que resolvio."
+    tags: [nuevo-C, prediccion]
+    ports:
+      isbr0:  { side: W, at: 2,  dir: in }
+      isbr1:  { side: W, at: 4,  dir: in }
+      pcsrc0: { side: W, at: 8,  dir: in }
+      pcsrc1: { side: W, at: 10, dir: in }
+      pc0:    { side: W, at: 14, dir: in }
+      pc1:    { side: W, at: 16, dir: in }
+      tgt0:   { side: W, at: 20, dir: in }
+      tgt1:   { side: W, at: 22, dir: in }
+      annul1: { side: W, at: 26, dir: in }
+      btb_we:   { side: E, at: 3,  dir: out }
+      btb_wPC:  { side: E, at: 7,  dir: out }
+      btb_wTgt: { side: E, at: 11, dir: out }
+      pred_we:  { side: E, at: 22, dir: out }
+      pred_wPC: { side: E, at: 26, dir: out }
+      pred_wTaken: { side: E, at: 30, dir: out }
+
+nets:
+  # ---------- PC / fetch ----------
+  - { id: PCnext, from: pcmux.out, to: pc.D, label: "PCF'" }
+  - { id: PC0, from: pc.Q, through: [ifid, idex],
+      to: { F: [btb.rPC0, bpred.rPC0, pcadd4.A, pcadd8.A], E: [pctadd0.A, verify.pc0, update.pc0] },
+      label: PCF, info: "PCF alimenta las tablas y los sumadores; se acarrea como PC0 para verificar/actualizar en EX." }
+  - { id: k4w, from: k4.out, to: pcadd4.B, label: false }
+  - { id: PCF4, from: pcadd4.Y, through: [ifid, idex],
+      to: { F: [btb.rPC1, bpred.rPC1], D: pcmux.in1, E: [pctadd1.A, verify.pc1, update.pc1] },
+      label: "PCF+4", info: "PCF+4 = 2a lectura de las tablas (via1); su version registrada PC1D reagrupa, y PC1E verifica/actualiza." }
+  - { id: k8w, from: k8.out, to: pcadd8.B, label: false }
+  - { id: PCp8, from: pcadd8.Y, to: pcmux.in0, label: "PC+8" }
+
+  # ---------- salidas de las tablas ----------
+  - { id: btb_hit0, class: control, from: btb.hit0, to: andPT0.a, label: btb_hit0 }
+  - { id: pred_t0,  class: control, from: bpred.taken0, to: andPT0.b, label: pred_t0 }
+  - { id: btb_hit1, class: control, from: btb.hit1, to: andPT1a.a, label: btb_hit1 }
+  - { id: pred_t1,  class: control, from: bpred.taken1, to: andPT1a.b, label: pred_t1 }
+  - { id: btb_tgt0, from: btb.target0, through: [ifid, idex], to: { F: muxTgt.in1, E: verify.ptg0 }, label: btb_tgt0, info: "Destino de la via0 del BTB: al mux de destino predicho y, registrado, a la verificacion (predTarget0E)." }
+  - { id: btb_tgt1, from: btb.target1, through: [ifid, idex], to: { F: muxTgt.in0, E: verify.ptg1 }, label: btb_tgt1 }
+
+  # ---------- logica de prediccion (IF) ----------
+  - { id: predTaken0, class: control, from: andPT0.y, through: [ifid, idex], y: { ifid: 24 },
+      to: { F: [orPkt.a, muxTgt.sel, notPT0.in, sqv1.in], E: verify.pt0 }, label: predTaken0,
+      info: "La via0 predice salto tomado. Fan-out: OR del paquete, selector del destino, ~ para la via1, anula-via1, y registrado a la verificacion." }
+  - { id: notPT0w, class: control, from: notPT0.out, to: andPT1.b, label: "~predTaken0" }
+  - { id: andPT1aw, class: control, from: andPT1a.y, to: andPT1.a, label: false }
+  - { id: predTaken1, class: control, from: andPT1.y, through: [ifid, idex],
+      to: { F: orPkt.b, E: verify.pt1 }, label: predTaken1 }
+  - { id: predTakenPkt, class: control, from: orPkt.y, to: pcselctl.predTk, label: predTakenPkt }
+  - { id: predTargetPkt, from: muxTgt.out, to: pcmux.in2, label: predTargetPkt }
+
+  # ---------- seleccion del PC siguiente ----------
+  - { id: PCsel, class: control, from: pcselctl.out, to: pcmux.sel, label: PCsel }
+  - { id: stallw, class: control, from: sStall.out, to: pcselctl.stall, label: false }
+  - { id: issuew, class: control, from: sIssue.out, to: pcselctl.issueCnt, label: false }
+
+  # ---------- fuentes en EX ----------
+  - { id: Br0, class: control, from: sBr0.out, to: orBr0.a, label: false }
+  - { id: Jmp0, class: control, from: sJmp0.out, to: orBr0.b, label: false }
+  - { id: isBr0, class: control, from: orBr0.y, to: [verify.isbr0, update.isbr0], label: isBr0E }
+  - { id: Br1, class: control, from: sBr1.out, to: orBr1.a, label: false }
+  - { id: Jmp1, class: control, from: sJmp1.out, to: orBr1.b, label: false }
+  - { id: isBr1, class: control, from: orBr1.y, to: [verify.isbr1, update.isbr1], label: isBr1E }
+  - { id: PCSrc0, class: control, from: sPCSrc0.out, to: [verify.pcsrc0, update.pcsrc0], label: PCSrc0E }
+  - { id: PCSrc1, class: control, from: sPCSrc1.out, to: [verify.pcsrc1, update.pcsrc1], label: PCSrc1E }
+  - { id: Imm0, from: sImm0.out, to: pctadd0.B, label: false }
+  - { id: Imm1, from: sImm1.out, to: pctadd1.B, label: false }
+  - { id: PCTarget0, from: pctadd0.Y, to: [verify.tgt0, update.tgt0], label: PCTarget0E }
+  - { id: PCTarget1, from: pctadd1.Y, to: [verify.tgt1, update.tgt1], label: PCTarget1E }
+
+  # ---------- salidas de verificacion ----------
+  - { id: flushDE, class: feedback, from: verify.flushDE, to: pcselctl.flushDE, label: flushDE, info: "Mala prediccion: unico caso que hace flush y redirige el PC." }
+  - { id: PCTargetE, class: feedback, from: verify.PCTargetE, to: pcmux.in3, label: PCTargetE, info: "PC correcto tras mala prediccion." }
+  - { id: annul1, class: control, from: verify.annul1, to: update.annul1, label: annul1 }
+
+  # ---------- actualizacion de las tablas (realimentacion) ----------
+  - { id: btb_we,   class: feedback, from: update.btb_we,   to: btb.we,      label: btb_we }
+  - { id: btb_wPC,  class: feedback, from: update.btb_wPC,  to: btb.wPC,     label: btb_wPC }
+  - { id: btb_wTgt, class: feedback, from: update.btb_wTgt, to: btb.wTarget, label: btb_wTgt }
+  - { id: pred_we,  class: feedback, from: update.pred_we,  to: bpred.we,    label: pred_we }
+  - { id: pred_wPC, class: feedback, from: update.pred_wPC, to: bpred.wPC,   label: pred_wPC }
+  - { id: pred_wTaken, class: feedback, from: update.pred_wTaken, to: bpred.wTaken, label: pred_wTaken }
