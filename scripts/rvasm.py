@@ -26,6 +26,7 @@ def main():
     lines=[]
     for raw in open(src):
         raw = raw.split('#')[0].split('//')[0].strip()
+        if raw.startswith('.'): continue   # ignorar directivas (.text, .globl, ...)
         if raw: lines.append(raw)
     # pase 1: etiquetas
     labels={}; addr=0; prog=[]
