@@ -52,12 +52,13 @@ module datapath_dual_opt(
   flopr #(32) pcreg(.clk(clk), .reset(reset), .d(PCNextF), .q(PCF));
 
   // registro IF/ID: guarda el par y la prediccion. Se congela en stall, se limpia en
-  // mala prediccion o reagrupamiento (flushIFID); la via1 ademas si se predijo salto en via0.
+  // mala prediccion o reagrupamiento (flushIFID). La anulacion de la via1 por prediccion
+  // (predAnnul1) va en el DATO, no en el clear: asi NO borra una instruccion congelada
+  // en un stall (clear tiene prioridad sobre enable y la perderia).
   wire        flushIFID = flushDE | (issueCount==2'd1);
-  wire        clrI1     = flushIFID | predAnnul1;
   wire [31:0] I0D, I1D, PC0D;
-  flopenrc #(32) ifid_i0 (.clk(clk), .reset(reset), .clear(flushIFID), .en(~stall), .d(Instr0F),     .q(I0D));
-  flopenrc #(32) ifid_i1 (.clk(clk), .reset(reset), .clear(clrI1),     .en(~stall), .d(Instr1F),     .q(I1D));
+  flopenrc #(32) ifid_i0 (.clk(clk), .reset(reset), .clear(flushIFID), .en(~stall), .d(Instr0F),                     .q(I0D));
+  flopenrc #(32) ifid_i1 (.clk(clk), .reset(reset), .clear(flushIFID), .en(~stall), .d(predAnnul1 ? 32'b0 : Instr1F), .q(I1D));
   flopenrc #(32) ifid_pc0(.clk(clk), .reset(reset), .clear(flushIFID), .en(~stall), .d(PCF),         .q(PC0D));
   flopenrc #(32) ifid_pc1(.clk(clk), .reset(reset), .clear(flushIFID), .en(~stall), .d(PCF4),        .q(PC1D));
   // prediccion registrada hacia ID
