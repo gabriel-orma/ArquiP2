@@ -24,6 +24,22 @@ los programas:
 - Profesor: `M[x1+0..52]` = `11 5 12 7 16 23 24 18 24 74 4 0 1 1` (x1=1536).
 - Showcase: `Mem[100] = 180`. · Propio prog1: `Mem[100] = 30`.
 
+### Comprobación por etapa (programa del profesor)
+El programa del profesor cierra cada etapa escribiendo su resultado en memoria (`sw`).
+Esa palabra almacenada es la **señal de comprobación** de la etapa: si coincide con la
+referencia, la etapa pasó. Las tres configuraciones (A, B, C) escriben el **mismo valor**
+en cada punto, lo que verifica que el dual-issue y la optimización no alteran la semántica.
+
+| Etapa | Qué ejercita | Dirección `M[x1+off]` | Referencia | A (single-issue) | B (dual) | C (dual+pred+BTB) | ✔ |
+|---|---|---|---|---|---|---|---|
+| **A** | Emisión y dependencias RAW (forwarding) | +0, +4, +8 | `11, 5, 12` | `11, 5, 12` | `11, 5, 12` | `11, 5, 12` | ✔ |
+| **B** | Memoria y hazard load-use | +12, +16, +20 | `7, 16, 23` | `7, 16, 23` | `7, 16, 23` | `7, 16, 23` | ✔ |
+| **C** | Bucles y branches (predictor/BTB) | +24, +28, +32 | `24, 18, 24` | `24, 18, 24` | `24, 18, 24` | `24, 18, 24` | ✔ |
+| **D** | Integración (loads + branches encadenados) | +36, +40, +44, +48, +52 | `74, 4, 0, 1, 1` | `74, 4, 0, 1, 1` | `74, 4, 0, 1, 1` | `74, 4, 0, 1, 1` | ✔ |
+
+Ciclos hasta `fin` (mismo programa): **A = 456 · B = 478 · C = 406**. El resultado
+funcional es idéntico en las cuatro etapas; solo cambia el número de ciclos.
+
 ## Tabla comparativa
 
 | Programa | Config | Ciclos | Retiradas | IPC | CPI | ×vs A | ×vs B | Doble emisión | Precisión |
