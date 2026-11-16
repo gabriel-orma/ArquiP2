@@ -1,5 +1,6 @@
-module top(input  clk, reset, 
-           output [31:0] WriteData, DataAdr, 
+module top #(parameter MEMFILE = "riscvtest.dat")
+          (input  clk, reset,
+           output [31:0] WriteData, DataAdr,
            output MemWrite);
   
   wire [31:0] PC, Instr, ReadData; 
@@ -16,10 +17,10 @@ module top(input  clk, reset,
     .ReadData(ReadData)
   ); 
 
-  imem imem(
-    .a(PC), 
+  imem #(.MEMFILE(MEMFILE)) imem(
+    .a(PC),
     .rd(Instr)
-  ); 
+  );
 
   dmem dmem(
     .clk(clk), 

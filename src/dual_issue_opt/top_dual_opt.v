@@ -1,12 +1,13 @@
 // top_dual_opt: top-level de la configuracion C (dual-issue + predictor 2b + BTB).
-module top_dual_opt(input         clk, reset,
+module top_dual_opt #(parameter MEMFILE = "riscvtest.dat")
+                   (input         clk, reset,
                     output [31:0] WriteData, DataAdr,
                     output        MemWrite);
 
   wire [31:0] PCF, Instr0F, Instr1F, ReadData;
   wire [1:0]  issueCount;
 
-  imem2 imem(.a(PCF), .rd0(Instr0F), .rd1(Instr1F));
+  imem2 #(.MEMFILE(MEMFILE)) imem(.a(PCF), .rd0(Instr0F), .rd1(Instr1F));
 
   datapath_dual_opt dp(
     .clk(clk), .reset(reset),
